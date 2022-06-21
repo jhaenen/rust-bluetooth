@@ -3,7 +3,6 @@
 
 use rust_emb as _; // global logger + panicking-behavior + memory layout
 
-
 #[rtic::app(device = nrf52833_hal::pac, dispatchers = [UARTE1])]
 mod app {
     use nrf52833_hal::{
@@ -25,12 +24,14 @@ mod app {
     }
 
     #[init]
-    fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
+    fn init(mut ctx: init::Context) -> (Shared, Local, init::Monotonics) {
         let mono = MonoTimer::new(ctx.device.TIMER0);
         
         let p0 = Parts::new(ctx.device.P0);
         let led = p0.p0_21.into_push_pull_output(Level::High).degrade(); // Create the blinky LED
         p0.p0_11.into_push_pull_output(Level::Low); // Set column to low to allow blinking
+
+        ctx.core.SCB.set_sleepdeep(); // Enable deep sleep
 
         defmt::println!("RTIC blinky example");
         blink::spawn().ok();
@@ -39,7 +40,9 @@ mod app {
 
     #[idle]
     fn idle(_: idle::Context) -> ! {
-        loop {}
+        loop {
+            rtic::export::wfi(); // Sleep and wait for interrupt
+        }
     }
 
     #[task(local = [led])]
